@@ -7,10 +7,11 @@ initial caching method for this was to instantiate a constant that contained
 the result of a database query, for example:
 
     PORTALS = Portal.find_all_portals # Returns a hash keyed on the Portal ID
-    # A portal in the context of TouchLocal is an individual location site, 
-    # for example touchlondon.co.uk or touchaberdeen.com. There are >100 of 
-    # these sites, and a large proportion of the broad configuration of these 
-    # Portals is stored in the Database.
+
+A portal in the context of TouchLocal is an individual location site, for
+example touchlondon.co.uk or touchaberdeen.com. There are >100 of these sites,
+and a large proportion of the broad configuration of these Portals is stored
+in the Database.
 
 While this was a quick and simple solution, it was also a dirty one, as it
 caused each app server instance (each Mongrel or Phusion Passenger runner) to
@@ -41,13 +42,19 @@ Basic Usage:
     # Now you can start attaching MemcacheObject::Proxy instances to this 
     # cache instance, as such:
     AUTHORS = MemcacheObject::Proxy.new(LOCAL_CACHE, 'AUTHORS', 1.day) do
-      Author.get_all_authors
+      hash = {}
+      Author.find(:all).each do |author|
+        hash[author.id] = author
+      end
+      hash
     end
 
 Note that the `MemcacheObject::Proxy.new` call takes a block as a parameter -
 this is the block that is called to populate the cache. Standard block syntax
 (as in, both {} and do-end) are useful here - the do-end form is used above
-simply for clarity
+simply for clarity. The example here is a bit more complicated to show that
+you can do pretty much whatever you like in the block. Plenty of simple cases
+are useful too!
 
 `AUTHORS` is now a fully-fledged proxy object. On first run, all that has
 happened is that the Proxy is initialised, but no data has been loaded. If you
@@ -78,6 +85,35 @@ mentioned in the opening section. Additionally, as ActiveRecord objects are
 passed through the `MemcacheObject::Mash` object before storage (see below),
 there is additional safety in the caching while maintaining application
 compatibility.
+
+### Configuration Paramters
+
+The example above defined a Proxy instance as:
+
+    AUTHORS = MemcacheObject::Proxy.new(LOCAL_CACHE, 'AUTHORS', 1.day)
+
+while upon execution the log showed:
+
+    [DEBUG] 091201 17:38:03 :: Cache miss: MemcacheObject_Proxy_AUTHORS ({:expires_in=>1 day})
+
+While the first parameter to the Proxy is the Memcache instance to use, the
+second one partly defines the cache key and the third uses
+`ActiveSupport::CoreExtensions::Numeric::Time` to provide a number of seconds
+offset for Cache expiration. Seconds can be provided directly if desired.
+
+The Cache key, on the other hand, is quite important. The default behaviour if the Cache key segment is missing is to use the `object_id` of the supplied block, which will change each execution and will therefore be different on each running Mongrel or Passenger (or Thin etc etc) app server instance. It's advisable then to use something consistent, and if you change what is cached there, either expire the Proxy data using
+
+    # e.g. AUTHORS.flush_cache
+    proxy_instance.flush_cache
+
+or change the name of the Cache:
+
+    MemcacheObject::Proxy.new(LOCAL_CACHE, 'AUTHORS_20091201', 1.day)
+
+This name is not used outside the class so can be anything you want anyway,
+but it's good to have something human readable for parsing logs etc. Note that
+the complete cache key is namespaced with the `MemcacheObject_Proxy_` prefix
+so will not collide with other manually managed cache data.
 
 ## Utility Classes and Methods
 
