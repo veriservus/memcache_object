@@ -1,5 +1,20 @@
 module MemcacheObject
   class Mash < Hash # Model-accessible Hash
+    def class
+      (self['_class'] || 'Mashy').constantize
+    end
+
+    def is_a?(klass)
+      k = self.class
+      while k
+        return true if k == klass
+        k = k.superclass
+      end
+      false
+    end
+
+    alias :kind_of :is_a?
+
     def initialize(hash = nil)
       super()
       self.replace(self.class.mashify(hash)) if hash
@@ -48,3 +63,4 @@ module MemcacheObject
     end
   end
 end
+

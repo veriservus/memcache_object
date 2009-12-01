@@ -3,31 +3,43 @@ module MemcacheObject
   class Proxy
     # It's very tempting to want to add
     # extend ActiveSupport::Memoizable
-    # here and to memoize the cache_get method. However, that would actually 
+    # here and to memoize the cache_get method. However, that would actually
     # be counter-productive in the case where this Proxy is used like this:
-    # 
+    #
     # # AUTHORS = Author.get_all_authors # Replace this with the next line
     # AUTHORS = MemcacheObject::Proxy.new(LOCAL_CACHE, 'AUTHORS', 1.day){ Author.get_all_authors } ; nil
-    # 
-    # What will happen there is that as the PORTALS constant is not unloaded 
-    # and reloaded (as it exists in global scope), the memoized value is never 
-    # purged from memory. Essentially all we would have achieved is to add 
-    # Memcache to the list of places we store data, along with in the app 
+    #
+    # What will happen there is that as the PORTALS constant is not unloaded
+    # and reloaded (as it exists in global scope), the memoized value is never
+    # purged from memory. Essentially all we would have achieved is to add
+    # Memcache to the list of places we store data, along with in the app
     # memory itself. So, we just let each lookup use Memcache.
-    # 
-    # To minimise these lookups make sure you always store the intermediate 
+    #
+    # To minimise these lookups make sure you always store the intermediate
     # result from the query - that is:
-    # 
+    #
     # author = AUTHORS[126] # Single Memcache query
     # author.name
     # author.id
-    # 
+    #
     # This will result in 2 Memcache queries:
     # AUTHORS[126].name
     # AUTHORS[126].portal_id
 
+    alias :old_class :class
+
+    def class
+      cache_get.class
+    end
+
+    def is_a?(klass)
+      cache_get.is_a?(klass)
+    end
+
+    alias :kind_of? :is_a?
+
     attr_reader :cache_key
-  
+
     def initialize(cache_store, cache_key_fragment = nil, cache_timeout = nil, &blk)
       @cache = cache_store
       @proc = blk
@@ -35,7 +47,7 @@ module MemcacheObject
 
       cache_key_fragment = @proc.object_id unless cache_key_fragment
       cache_key_parts = self.class.to_s.split(/\W+/)
-      cache_key_parts << cache_key_fragment 
+      cache_key_parts << cache_key_fragment
       @cache_key = cache_key_parts.join(' ').gsub(/\W+/, '_')
     end
 
@@ -62,10 +74,10 @@ module MemcacheObject
       def cache_get
         data = @cache.fetch(@cache_key, :expires_in => @expires_in) do
           raw_data = @proc.call
-          self.class.serialize(raw_data)
+          self.old_class.serialize(raw_data)
         end
         #RAILS_DEFAULT_LOGGER.debug{"MemcacheObject::Proxy cache_get deserializing #{data.inspect}"}
-        return self.class.deserialize(data)
+        return self.old_class.deserialize(data)
       end
 
       def self.deserialize(data)
@@ -83,7 +95,7 @@ module MemcacheObject
         if data.is_a?(Array)
           data.collect{ |item| serialize(item) }
         elsif data.is_a?(ActiveRecord::Base)
-          data.attributes
+          data.attributes.merge('_class' => data.class.name)
         elsif data.is_a?(Hash)
            Hash[ *data.collect{|a, b| [ serialize(a), serialize(b) ] }.flatten ]
         else
