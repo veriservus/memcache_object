@@ -44,6 +44,11 @@ Basic Usage:
       Author.get_all_authors
     end
 
+Note that the `MemcacheObject::Proxy.new` call takes a block as a parameter -
+this is the block that is called to populate the cache. Standard block syntax
+(as in, both {} and do-end) are useful here - the do-end form is used above
+simply for clarity
+
 `AUTHORS` is now a fully-fledged proxy object. On first run, all that has
 happened is that the Proxy is initialised, but no data has been loaded. If you
 then access the `AUTHORS` constant, the data is initialized and returned
