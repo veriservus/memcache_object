@@ -86,6 +86,16 @@ passed through the `MemcacheObject::Mash` object before storage (see below),
 there is additional safety in the caching while maintaining application
 compatibility.
 
+N.B: If you are using `script/console` and you initialize a
+`MemcacheObject::Proxy` object, the IRB console automatically calls `.inspect`
+on your returned object. To counteract this behaviour and see the true
+behaviour in the console add a `; nil` to the end of your statements
+
+    PORTALS = MemcacheObject::Proxy.new(LOCAL_CACHE, 'PORTALS', 1.day) {Portal.find_all_portals} ; nil
+
+`irb` then returns the `nil` but leaves the PORTALS constant properly
+initialized ready for use.
+
 ### Configuration Paramters
 
 The example above defined a Proxy instance as:
