@@ -1,6 +1,10 @@
 # MemcacheObject
 
-MemcacheObject is a Ruby on Rails plugin for easy caching of objects for use as constants. The plugin grew out of a need at TouchLocal to have ready access to database table contents that was of reasonable size but changed rarely. The initial caching method for this was to instantiate a constant that contained the result of a database query, for example:
+MemcacheObject is a Ruby on Rails plugin for easy caching of objects for use
+as constants. The plugin grew out of a need at TouchLocal to have ready access
+to database table contents that was of reasonable size but changed rarely. The
+initial caching method for this was to instantiate a constant that contained
+the result of a database query, for example:
 
     PORTALS = Portal.find_all_portals # Returns a hash keyed on the Portal ID
     # A portal in the context of TouchLocal is an individual location site, 
@@ -22,7 +26,53 @@ don't break the old code! Thus this suite of tools in this Plugin was born.
 
 ## MemcacheObject::Proxy
 
+Basic Usage:
 
+    # First, configure your Memcache server.
+    # It should be local to the server, if not localhost.
+    # This is best done in a config/initializers file
+    LOCAL_CACHE = ActiveSupport::Cache::MemCacheStore.new(
+      '127.0.0.1:11211', {:namespace => "local_#{RAILS_ENV}"})
+    
+    # It's useful to include the RAILS_ENV in the namespace, so that you can 
+    # use the same Memcache server in development and test and not have them 
+    # conflict.
+    
+    # Now you can start attaching MemcacheObject::Proxy instances to this 
+    # cache instance, as such:
+    AUTHORS = MemcacheObject::Proxy.new(LOCAL_CACHE, 'AUTHORS', 1.day) do
+      Author.get_all_authors
+    end
+
+`AUTHORS` is now a fully-fledged proxy object. On first run, all that has
+happened is that the Proxy is initialised, but no data has been loaded. If you
+then access the `AUTHORS` constant, the data is initialized and returned
+
+    >> AUTHORS.size
+    [DEBUG] 091201 17:38:03 :: Cache miss: MemcacheObject_Proxy_AUTHORS ({:expires_in=>1 day})
+    [DEBUG] 091201 17:38:05 :: SQL (1.0ms)  SET NAMES 'utf8'
+    [DEBUG] 091201 17:38:05 :: SQL (1.8ms)  SET SQL_AUTO_IS_NULL=0
+    [DEBUG] 091201 17:38:07 :: Portal Load (60.0ms)  SELECT * FROM `authors` 
+    [DEBUG] 091201 17:38:07 :: Cache write (will save 120.36ms): MemcacheObject_Proxy_AUTHORS
+    => 116
+
+Subsequent calls within the expiration period (in this case, 1 day) skip the
+database loading step and just retrieve the data directly from Memcache:
+
+    >> AUTHORS.size
+    [DEBUG] 091201 17:41:14 :: Cache hit: MemcacheObject_Proxy_AUTHORS ({:expires_in=>1 day})
+    => 116
+
+The Proxy class also implements `method_missing` and `inspect` so that any
+calls made on the Proxy are passed through to the stored object in a way that
+makes sense. `size`, in the above example, utilized this `method_missing`
+implementation as the Proxy itself has no concept of size, but the data does.
+In this same way, calls to `inspect` are passed to the target data. This all
+goes towards making the Proxy a drop-in replacement for the direct cache
+mentioned in the opening section. Additionally, as ActiveRecord objects are
+passed through the `MemcacheObject::Mash` object before storage (see below),
+there is additional safety in the caching while maintaining application
+compatibility.
 
 ## Utility Classes and Methods
 
