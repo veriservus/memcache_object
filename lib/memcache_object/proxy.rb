@@ -6,8 +6,8 @@ module MemcacheObject
     # here and to memoize the cache_get method. However, that would actually 
     # be counter-productive in the case where this Proxy is used like this:
     # 
-    # # PORTALS = Portal.get_all_portals # Replace this with the next line
-    # PORTALS = MemcacheObject::Proxy.new(LOCAL_CACHE, 'PORTALS', 1.day){ Portal.get_all_portals } ; nil
+    # # AUTHORS = Author.get_all_authors # Replace this with the next line
+    # AUTHORS = MemcacheObject::Proxy.new(LOCAL_CACHE, 'AUTHORS', 1.day){ Author.get_all_authors } ; nil
     # 
     # What will happen there is that as the PORTALS constant is not unloaded 
     # and reloaded (as it exists in global scope), the memoized value is never 
@@ -18,13 +18,13 @@ module MemcacheObject
     # To minimise these lookups make sure you always store the intermediate 
     # result from the query - that is:
     # 
-    # portal = PORTALS[126] # Single Memcache query
-    # portal.name
-    # portal.portal_id
+    # author = AUTHORS[126] # Single Memcache query
+    # author.name
+    # author.id
     # 
     # This will result in 2 Memcache queries:
-    # PORTALS[126].name
-    # PORTALS[126].portal_id
+    # AUTHORS[126].name
+    # AUTHORS[126].portal_id
 
     attr_reader :cache_key
   
