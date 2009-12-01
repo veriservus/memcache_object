@@ -7,7 +7,7 @@ module MemcacheObject
     # be counter-productive in the case where this Proxy is used like this:
     # 
     # # PORTALS = Portal.get_all_portals # Replace this with the next line
-    # PORTALS = MemcacheObject::Proxy.new(LOCAL_CACHE, 'PORTALS'){ Portal.get_all_portals } ; nil
+    # PORTALS = MemcacheObject::Proxy.new(LOCAL_CACHE, 'PORTALS', 1.day){ Portal.get_all_portals } ; nil
     # 
     # What will happen there is that as the PORTALS constant is not unloaded 
     # and reloaded (as it exists in global scope), the memoized value is never 
@@ -28,9 +28,10 @@ module MemcacheObject
 
     attr_reader :cache_key
   
-    def initialize(cache_store, cache_key_fragment = nil, &blk)
+    def initialize(cache_store, cache_key_fragment = nil, cache_timeout = nil, &blk)
       @cache = cache_store
       @proc = blk
+      @expires_in = cache_timeout || 1.day
 
       cache_key_fragment = @proc.object_id unless cache_key_fragment
       cache_key_parts = self.class.to_s.split(/\W+/)
@@ -59,7 +60,7 @@ module MemcacheObject
 
     #protected
       def cache_get
-        data = @cache.fetch(@cache_key, :expires_in => 1.day) do
+        data = @cache.fetch(@cache_key, :expires_in => @expires_in) do
           raw_data = @proc.call
           self.class.serialize(raw_data)
         end

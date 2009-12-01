@@ -11,4 +11,4 @@ module MemcacheObject
   end
 end
 
-ActiveRecord::Base.send :extend MemcacheObject::ActiveRecordExtensions
+ActiveRecord::Base.send :extend, MemcacheObject::ActiveRecordExtensions
